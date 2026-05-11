@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <title>Six-Gun Gorilla — OLC</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    html,body{width:100%;height:100%;background:#1a1410;overflow:hidden;font-family:'Courier New',monospace;}
+    #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#e8dcc0 0%,#1a1410 75%);}
+    #shell{position:relative;width:480px;max-width:100vw;aspect-ratio:480/720;box-shadow:0 0 0 4px #1a1410,0 0 0 8px #c9a84c;background:#1a1410;}
+    canvas{width:100%;height:100%;display:block;image-rendering:pixelated;image-rendering:crisp-edges;}
+    #tbts{position:absolute;bottom:12px;left:0;right:0;display:flex;justify-content:space-between;padding:0 16px;}
+    .tb{width:88px;height:60px;background:#e8dcc0;color:#1a1410;border:3px solid #1a1410;font-family:monospace;font-size:11px;font-weight:900;cursor:pointer;touch-action:none;user-select:none;box-shadow:3px 3px 0 #1a1410;}
+    .tb.on{background:#c9a84c;}
+    #gate{position:absolute;inset:0;background:rgba(26,20,16,0.96);display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px;z-index:10;}
+    #gate.show{display:flex;}
+    .gcard{width:100%;max-width:380px;border:3px solid #c9a84c;background:#1a1410;}
+    .ghdr{background:#c9a84c;color:#1a1410;text-align:center;padding:8px;font-size:10px;font-weight:700;letter-spacing:.2em;}
+    .gbody{padding:16px 20px;}
+    .gtitle{font-family:Georgia,serif;font-size:32px;color:#c9a84c;text-align:center;line-height:1;margin-bottom:4px;}
+    .gsub{font-size:9px;letter-spacing:.22em;color:#e8dcc0;text-align:center;margin-bottom:16px;}
+    .gseats{text-align:center;margin-bottom:14px;}
+    .gseats .num{font-family:Georgia,serif;font-size:44px;color:#c9a84c;display:block;line-height:1;}
+    .gseats .lbl{font-size:9px;letter-spacing:.2em;color:#e8dcc0;}
+    .gterms{border:1px solid #c9a84c;padding:12px;font-size:10px;line-height:1.7;color:#e8dcc0;margin-bottom:14px;}
+    .gterms strong{color:#c9a84c;}
+    .grow{display:flex;justify-content:space-between;border-top:1px solid #333;padding-top:8px;margin-top:8px;font-size:10px;}
+    .grow span{color:#c9a84c;font-weight:700;}
+    .gbtn{display:block;width:100%;padding:14px;margin-bottom:8px;font-family:'Courier New',monospace;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;text-align:center;cursor:pointer;border:3px solid #1a1410;text-decoration:none;box-shadow:4px 4px 0 #1a1410;}
+    .gbtn-gold{background:#c9a84c;color:#1a1410;}
+    .gbtn-aged{background:#e8dcc0;color:#1a1410;}
+    .gbtn-enter{background:#1a1410;color:#c9a84c;border-color:#c9a84c;display:none;margin-top:4px;}
+    .gbtn-enter.show{display:block;}
+    .gseal{text-align:center;padding:8px;font-size:8px;letter-spacing:.16em;color:#444;border-top:1px solid #222;}
+  </style>
+</head>
+<body>
+<div id="wrap">
+  <div id="shell">
+    <canvas id="c" width="480" height="720"></canvas>
+    <div id="tbts">
+      <button class="tb" id="tbl" onpointerdown="tl(1)" onpointerup="tl(0)" onpointercancel="tl(0)" onpointerleave="tl(0)">Z LEFT</button>
+      <button class="tb" id="tbr" onpointerdown="tr(1)" onpointerup="tr(0)" onpointercancel="tr(0)" onpointerleave="tr(0)">X RIGHT</button>
+    </div>
+    <div id="gate">
+      <div class="gcard">
+        <div class="ghdr">Old Line Company · Founding Charter</div>
+        <div class="gbody">
+          <div class="gtitle">SIX-GUN<br>GORILLA</div>
+          <div class="gsub">Stage 1 Cleared · The Order Is Watching</div>
+          <div class="gseats"><span class="num">5,000</span><span class="lbl">Founding Seats Remaining</span></div>
+          <div class="gterms">
+            <strong>The Founding Charter</strong><br><br>
+            First 5,000 riders get five years of access — paid once at the door. No subscriptions. No renewals.
+            <div class="grow"><div>Five-Year Access</div><span>$60.00</span></div>
+            <div class="grow"><div>Monthly equivalent</div><span>$1.00/mo</span></div>
+            <div class="grow"><div>Seat limit</div><span>5,000 total</span></div>
+          </div>
+          <!-- SWAP THIS HREF WITH YOUR STRIPE LINK WHEN READY -->
+          <a class="gbtn gbtn-gold" href="https://buy.stripe.com/REPLACE_WITH_STRIPE_LINK" target="_blank" rel="noopener" onclick="onFund()">Secure Your Seat — $60</a>
+          <button class="gbtn gbtn-aged" onclick="onShare()">Share to Ride Free</button>
+          <button class="gbtn gbtn-enter" id="btnenter" onclick="onEnter()">Enter Stage 2 ▸</button>
+        </div>
+        <div class="gseal">Approved by the Old Line Code Authority · Est. Maryland</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const CV=document.getElementById("c");
+const X=CV.getContext("2d");
+X.imageSmoothingEnabled=false;
+const W=480,H=720;
+const INK="#1a1410",PAPER="#f2ead8",AGED="#e8dcc0",GOLD="#c9a84c";
+
+let TL=0,TR=0;
+function tl(v){TL=v;document.getElementById("tbl").classList.toggle("on",!!v);}
+function tr(v){TR=v;document.getElementById("tbr").classList.toggle("on",!!v);}
+
+function onFund(){setTimeout(()=>{document.getElementById("btnenter").classList.add("show");},1000);}
+function onShare(){
+  const url=location.href;
+  const txt="Riding with Six-Gun Gorilla. First 5,000 seats — $60 for five years. "+url;
+  try{
+    if(navigator.share){navigator.share({title:"Six-Gun Gorilla",text:txt,url}).catch(function(){});}
+    else if(navigator.clipboard){navigator.clipboard.writeText(txt).catch(function(){});}
+    else{window.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(txt),"_blank");}
+  }catch(e){}
+  document.getElementById("btnenter").classList.add("show");
+}
+function onEnter(){
+  document.getElementById("gate").classList.remove("show");
+  beginStage2();
+}
+function showGate(){document.getElementById("gate").classList.add("show");}
+
+const K={};
+let ZD=0,XD=0;
+window.addEventListener("keydown",function(e){
+  K[e.key.toLowerCase()]=1;
+  if(e.key==="z"||e.key==="Z")ZD=1;
+  if(e.key==="x"||e.key==="X")XD=1;
+  if(["arrowup","arrowdown","arrowleft","arrowright"," ","z","x"].includes(e.key.toLowerCase()))e.preventDefault();
+});
+window.addEventListener("keyup",function(e){
+  K[e.key.toLowerCase()]=0;
+  if(e.key==="z"||e.key==="Z")ZD=0;
+  if(e.key==="x"||e.key==="X")XD=0;
+});
+
+const P={x:W/2,y:H-120,w:36,h:44,hp:5,mhp:5,t:0,hurt:0};
+const BU=[],EN=[],PA=[],CATS=[],STARS=[];
+let SCY=0,WT=0,SC=0,BSP=0,SN=1,SCORE=0,FC=0;
+let GS="title",IS=0;
+
+for(var i=0;i<14;i++)CATS.push({x:Math.random()*W,w:60+Math.random()*100,h:140+Math.random()*180,sp:2+Math.floor(Math.random()*3)});
+for(var i=0;i<60;i++)STARS.push({x:Math.random()*W,y:Math.random()*H*4,r:Math.random()*1.6});
+
+function fire(){
+  if(FC>0)return;
+  var L=ZD||TL,R=XD||TR;
+  if(!L&&!R)return;
+  var lx=P.x-12,rx=P.x+12,py=P.y-8;
+  if(L&&R){BU.push({x:lx,y:py,vx:0,vy:-9,f:"p",l:80});BU.push({x:rx,y:py,vx:0,vy:-9,f:"p",l:80});}
+  else if(L){BU.push({x:lx,y:py,vx:-3.2,vy:-8.4,f:"p",l:80});BU.push({x:rx,y:py,vx:-2.6,vy:-8.6,f:"p",l:80});}
+  else{BU.push({x:lx,y:py,vx:2.6,vy:-8.6,f:"p",l:80});BU.push({x:rx,y:py,vx:3.2,vy:-8.4,f:"p",l:80});}
+  muz(lx,py);muz(rx,py);FC=9;
+}
+function muz(x,y){for(var i=0;i<4;i++)PA.push({x:x,y:y,vx:(Math.random()-.5)*2,vy:-1-Math.random()*2,l:12,m:12,c:GOLD,s:2});}
+function bst(x,y,c){for(var i=0;i<8;i++)PA.push({x:x,y:y,vx:(Math.random()-.5)*4,vy:(Math.random()-.5)*4,l:24,m:24,c:c,s:2});}
+function bbst(x,y){for(var i=0;i<12;i++)PA.push({x:x,y:y,vx:(Math.random()-.5)*6,vy:(Math.random()-.5)*6,l:30,m:30,c:INK,s:3});bst(x,y,GOLD);}
+
+function spEnemy(){
+  if(Math.random()<.65){EN.push({x:40+Math.random()*(W-80),y:-40,vx:(Math.random()-.5)*1.2,vy:1.4+Math.random()*.8,hp:2,t:"o",a:0,w:28,h:36});}
+  else{EN.push({x:60+Math.random()*(W-120),y:-80,vx:Math.random()<.5?-.6:.6,vy:.5+Math.random()*.4,hp:5,t:"b",a:0,w:70,h:50});}
+}
+function spBoss(){EN.push({x:W/2,y:-120,vx:1.4,vy:.6,hp:40,t:"boss",a:0,w:140,h:90});BSP=1;}
+
+function drawBg(t){
+  var g=X.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,INK);g.addColorStop(.48,AGED);g.addColorStop(1,GOLD);
+  X.fillStyle=g;X.fillRect(0,0,W,H);
+  X.fillStyle=PAPER;
+  for(var i=0;i<STARS.length;i++){var s=STARS[i];X.fillRect(s.x,((s.y+SCY*.2)%(H*1.5)),s.r,s.r);}
+  for(var i=0;i<CATS.length;i++){
+    var c=CATS[i],cy=((c.x+SCY*.5)%(H+400))-200,by=H-220-(cy*.05);
+    X.fillStyle=INK;X.fillRect(c.x-c.w/2,by,c.w,c.h);
+    for(var j=0;j<c.sp;j++){var sx=c.x-c.w/2+(j+.5)*(c.w/c.sp);X.beginPath();X.moveTo(sx-8,by);X.lineTo(sx,by-40-j*4);X.lineTo(sx+8,by);X.closePath();X.fill();}
+    X.fillStyle=GOLD;X.fillRect(c.x-3,by+30,6,14);X.beginPath();X.arc(c.x,by+30,3,0,Math.PI,true);X.fill();
+  }
+  for(var i=0;i<20;i++){var sy=((i*80+SCY)%(H+80))-40;X.fillStyle=i%2===0?INK:AGED;X.fillRect(0,sy,W,4);}
+  for(var i=0;i<8;i++){
+    var cx=(i*73+30)%W,cy2=((i*220+SCY*1.2)%(H+200))-100;
+    X.fillStyle=INK;X.fillRect(cx,cy2,6,30);X.fillRect(cx-6,cy2+8,6,4);X.fillRect(cx-6,cy2+4,4,8);X.fillRect(cx+6,cy2+12,6,4);X.fillRect(cx+8,cy2+8,4,8);
+  }
+}
+function drawGorilla(x,y,t){
+  var bob=Math.sin(t*.25)*1.5;
+  X.fillStyle=INK;
+  X.fillRect(x-22,y+14+bob,44,16);X.fillRect(x-24,y+12+bob,6,6);X.fillRect(x+18,y+12+bob,6,6);
+  var lp=Math.floor(t/6)%2;
+  X.fillRect(x-18,y+28+bob,4,12+(lp?0:2));X.fillRect(x+14,y+28+bob,4,12+(lp?2:0));
+  X.fillRect(x-8,y+28+bob,4,12+(lp?2:0));X.fillRect(x+4,y+28+bob,4,12+(lp?0:2));
+  X.fillStyle=GOLD;X.fillRect(x-8,y+12+bob,16,4);
+  X.fillStyle=INK;X.fillRect(x-12,y-4+bob,24,18);X.fillRect(x-9,y-16+bob,18,14);
+  X.fillStyle=AGED;X.fillRect(x-6,y-8+bob,12,6);
+  X.fillStyle=INK;X.fillRect(x-5,y-13+bob,3,3);X.fillRect(x+2,y-13+bob,3,3);X.fillRect(x-2,y-6+bob,1,1);X.fillRect(x+1,y-6+bob,1,1);
+  X.fillRect(x-12,y-22+bob,24,3);X.fillRect(x-7,y-26+bob,14,4);
+  X.fillStyle=GOLD;X.fillRect(x-7,y-23+bob,14,1);
+  var L=ZD||TL,R=XD||TR,rc=FC>6?2:0;
+  var la=-.3,ra=.3;
+  if(L&&!R){la=-.9;ra=-.6;}else if(R&&!L){la=.6;ra=.9;}else if(L&&R){la=0;ra=0;}
+  function dp(px,py,ang){X.save();X.translate(px,py);X.rotate(ang);X.fillStyle=INK;X.fillRect(-2,-2-rc,4,10);X.fillStyle=GOLD;X.fillRect(-2,-2-rc,4,2);X.restore();}
+  dp(x-14,y+2+bob,la);dp(x+14,y+2+bob,ra);
+  if(P.hurt>0){X.fillStyle=GOLD;X.globalAlpha=.35;X.fillRect(x-14,y-26+bob,28,56);X.globalAlpha=1;}
+}
+function drawOutlaw(e){
+  X.fillStyle=INK;X.fillRect(e.x-10,e.y-4,20,24);X.fillRect(e.x-8,e.y-14,16,12);X.fillRect(e.x-9,e.y-22,18,3);X.fillRect(e.x-5,e.y-28,10,6);
+  X.fillStyle=GOLD;X.fillRect(e.x-6,e.y-11,5,3);X.fillRect(e.x+1,e.y-11,5,3);
+  X.fillStyle=INK;X.fillRect(e.x-5,e.y-10,3,1);X.fillRect(e.x+2,e.y-10,3,1);
+  X.fillStyle=GOLD;X.fillRect(e.x-2,e.y+18,4,6);
+}
+function drawBlimp(e){
+  X.save();X.translate(e.x,e.y);
+  X.fillStyle=AGED;X.beginPath();X.ellipse(0,0,35,18,0,0,Math.PI*2);X.fill();
+  X.strokeStyle=INK;X.lineWidth=2;X.beginPath();X.ellipse(0,0,35,18,0,0,Math.PI*2);X.stroke();
+  X.fillStyle=GOLD;X.fillRect(-30,-2,60,2);
+  X.fillStyle=INK;X.fillRect(-8,16,16,14);X.fillStyle=PAPER;X.fillRect(-5,19,10,7);
+  X.fillStyle=INK;X.fillRect(-3,21,6,4);X.fillStyle=GOLD;X.fillRect(-1,24,2,1);
+  X.fillStyle=INK;X.fillRect(35,-1,6,2);X.fillRect(40,-3+Math.sin(e.a*.6)*4,2,6);
+  X.restore();
+}
+function drawBoss(e){
+  X.save();X.translate(e.x,e.y);
+  X.fillStyle=INK;X.beginPath();X.ellipse(0,0,70,35,0,0,Math.PI*2);X.fill();
+  X.fillStyle=AGED;X.beginPath();X.ellipse(0,-2,64,28,0,0,Math.PI*2);X.fill();
+  X.fillStyle=GOLD;X.fillRect(-60,-5,120,3);X.fillRect(-50,6,100,2);
+  X.fillStyle=INK;X.fillRect(-40,28,10,12);X.fillRect(30,28,10,12);X.fillRect(-5,30,10,14);
+  X.fillStyle=PAPER;X.fillRect(-12,32,24,12);X.fillStyle=INK;X.fillRect(-4,34,8,6);X.fillStyle=GOLD;X.fillRect(-1,38,2,4);
+  X.fillStyle=INK;X.fillRect(-50,-50,100,6);X.fillStyle=GOLD;X.fillRect(-50,-50,100*(e.hp/40),6);
+  X.restore();
+}
+function drawBullet(b){
+  X.fillStyle=b.f==="p"?GOLD:INK;X.fillRect(b.x-1,b.y-3,2,6);
+  X.fillStyle=PAPER;X.fillRect(b.x-1,b.y-1,2,2);
+}
+function drawHud(){
+  X.fillStyle=INK;X.fillRect(0,0,W,30);
+  X.fillStyle=GOLD;X.font="bold 14px monospace";
+  X.textAlign="left";X.fillText("STAGE "+SN,8,20);
+  X.textAlign="right";X.fillText("SCORE "+String(SCORE).padStart(6,"0"),W-8,20);
+  X.textAlign="center";
+  for(var i=0;i<P.mhp;i++){X.fillStyle=i<P.hp?GOLD:AGED;X.fillRect(W/2-32+i*14,8,10,10);X.fillStyle=INK;X.fillRect(W/2-30+i*14,10,2,2);}
+}
+function drawIntermission(t){
+  var g=X.createLinearGradient(0,0,0,H);g.addColorStop(0,INK);g.addColorStop(1,AGED);X.fillStyle=g;X.fillRect(0,0,W,H);
+  X.fillStyle=INK;X.fillRect(0,H-280,W,280);
+  X.fillStyle=AGED;X.beginPath();X.arc(W-70,90,36,0,Math.PI*2);X.fill();
+  X.fillStyle=INK;X.beginPath();X.arc(W-60,80,32,0,Math.PI*2);X.fill();
+  X.fillStyle=INK;
+  for(var i=0;i<5;i++){var sx=40+i*95;X.fillRect(sx-20,H-360,40,120);X.beginPath();X.moveTo(sx-22,H-360);X.lineTo(sx,H-420);X.lineTo(sx+22,H-360);X.closePath();X.fill();X.fillStyle=GOLD;X.fillRect(sx-3,H-340,6,14);X.fillStyle=INK;}
+  var bx=W/2-40,by=H-360;
+  X.fillStyle=INK;X.fillRect(bx-4,by-10,88,14);X.fillStyle=GOLD;X.fillRect(bx,by-6,80,4);
+  X.fillStyle=PAPER;X.font="bold 8px monospace";X.textAlign="center";X.fillText("TELEPHONE",W/2,by-9);
+  X.fillStyle=INK;X.fillRect(bx,by,80,200);X.fillStyle=PAPER;X.fillRect(bx+6,by+8,68,130);
+  X.fillStyle=INK;X.fillRect(bx+38,by+8,4,130);X.fillRect(bx+6,by+70,68,4);
+  X.fillRect(bx+22,by+60,36,80);X.fillRect(bx+30,by+38,20,22);
+  X.fillStyle=AGED;X.fillRect(bx+32,by+44,16,12);
+  X.fillStyle=INK;X.fillRect(bx+34,by+48,3,2);X.fillRect(bx+43,by+48,3,2);X.fillRect(bx+34,by+54,12,2);X.fillRect(bx+28,by+36,24,4);X.fillRect(bx+32,by+30,16,8);
+  X.fillStyle=GOLD;X.fillRect(bx+32,by+36,16,1);
+  X.fillStyle=INK;X.fillRect(bx+50,by+50,4,14);X.fillRect(bx+48,by+48,8,4);X.fillRect(bx+48,by+62,8,4);
+  for(var i=0;i<30;i++){X.fillStyle=PAPER;X.fillRect((i*17+(t*.4)%W)%W,((i*31+t*.6)%H),1,6);}
+  var dy=H-170;
+  X.fillStyle=INK;X.fillRect(20,dy,W-40,130);X.strokeStyle=GOLD;X.lineWidth=2;X.strokeRect(20,dy,W-40,130);
+  X.fillStyle=GOLD;X.fillRect(28,dy-14,200,22);X.fillStyle=INK;X.font="bold 12px monospace";X.textAlign="left";X.fillText("JOHN JAMES QUEST",36,dy+1);
+  X.fillStyle=PAPER;X.font="13px serif";X.textAlign="left";
+  var lines=['"The Order is watching, Gorilla.',' The Conference doesn\'t fold easy."',"",'           — meet me at the Cathedral.'];
+  var sc=Math.min(999,Math.floor((t-IS)/30)),iy=dy+28,used=0;
+  for(var li=0;li<lines.length;li++){X.fillText(lines[li].slice(0,Math.max(0,sc-used)),36,iy);iy+=22;used+=lines[li].length+1;}
+  X.fillStyle=GOLD;X.font="11px monospace";X.textAlign="right";
+  if(Math.floor(t/400)%2)X.fillText("[ ENTER ] CONTINUE ▸",W-32,dy+116);
+}
+
+function beginStage2(){SN=2;P.hp=P.mhp;EN.length=0;BU.length=0;BSP=0;SC=0;WT=0;IS=performance.now();GS="intermission";}
+function restart(){
+  P.hp=P.mhp;P.x=W/2;P.y=H-120;EN.length=0;BU.length=0;PA.length=0;
+  BSP=0;SC=0;WT=0;SN=1;SCORE=0;FC=0;SCY=0;
+  document.getElementById("gate").classList.remove("show");
+  document.getElementById("btnenter").classList.remove("show");
+  GS="title";
+}
+
+requestAnimationFrame(function loop(t){
+  requestAnimationFrame(loop);
+  X.clearRect(0,0,W,H);
+
+  if(GS==="title"){
+    drawBg(t);X.fillStyle=INK;X.fillRect(0,0,W,H);
+    X.fillStyle=GOLD;X.font="bold 42px serif";X.textAlign="center";X.fillText("SIX-GUN",W/2,220);X.fillText("GORILLA",W/2,268);
+    X.fillStyle=PAPER;X.font="12px monospace";X.fillText("AN OLC PRODUCTION",W/2,296);
+    X.fillStyle=AGED;X.fillRect(W/2-80,340,160,90);X.strokeStyle=GOLD;X.lineWidth=2;X.strokeRect(W/2-80,340,160,90);
+    X.fillStyle=INK;X.font="10px monospace";
+    X.fillText("Z  — LEFT ANGLE",W/2,364);X.fillText("X  — RIGHT ANGLE",W/2,384);
+    X.fillText("Z+X — STRAIGHT",W/2,404);X.fillText("ARROWS / WASD MOVE",W/2,422);
+    X.fillStyle=GOLD;X.font="bold 16px monospace";
+    if(Math.floor(t/500)%2)X.fillText("PRESS ENTER TO RIDE",W/2,500);
+    X.fillStyle=PAPER;X.font="10px monospace";X.fillText("THE ORDER IS WATCHING",W/2,H-30);
+    if(K["enter"]||K[" "])GS="playing";
+    return;
+  }
+  if(GS==="gate")return;
+  if(GS==="intermission"){
+    drawIntermission(t);
+    if(K["enter"]||K[" "]){SN=2;P.hp=P.mhp;EN.length=0;BU.length=0;BSP=0;SC=0;WT=0;GS="stage2";}
+    return;
+  }
+  if(GS==="victory"){
+    X.fillStyle=INK;X.fillRect(0,0,W,H);X.fillStyle=GOLD;X.font="bold 28px serif";X.textAlign="center";
+    X.fillText("THE CONFERENCE FALLS",W/2,H/2-20);X.fillStyle=PAPER;X.font="14px monospace";X.fillText("FINAL SCORE: "+SCORE,W/2,H/2+16);
+    X.fillStyle=GOLD;X.font="12px monospace";X.fillText("PRESS ENTER TO RIDE AGAIN",W/2,H/2+60);
+    if(K["enter"])restart();return;
+  }
+  if(GS==="gameover"){
+    X.fillStyle=INK;X.fillRect(0,0,W,H);X.fillStyle=GOLD;X.font="bold 36px serif";X.textAlign="center";
+    X.fillText("BURIED IN THE DUST",W/2,H/2-10);X.fillStyle=PAPER;X.font="12px monospace";X.fillText("SCORE: "+SCORE,W/2,H/2+20);
+    X.fillStyle=GOLD;X.fillText("PRESS ENTER TO RIDE AGAIN",W/2,H/2+60);
+    if(K["enter"])restart();return;
+  }
+
+  // playing / stage2
+  SCY+=2.4;drawBg(t);
+  var spd=3.4;
+  if(K["arrowleft"]||K["a"])P.x-=spd;if(K["arrowright"]||K["d"])P.x+=spd;
+  if(K["arrowup"]||K["w"])P.y-=spd*.8;if(K["arrowdown"]||K["s"])P.y+=spd*.8;
+  P.x=Math.max(24,Math.min(W-24,P.x));P.y=Math.max(80,Math.min(H-60,P.y));
+  P.t++;if(ZD||XD||TL||TR)fire();FC=Math.max(0,FC-1);if(P.hurt>0)P.hurt--;
+  WT++;var sr=GS==="stage2"?38:55;
+  if(!BSP&&WT>sr){WT=0;spEnemy();SC++;if(SC>=(GS==="stage2"?22:14))spBoss();}
+
+  for(var i=0;i<EN.length;i++){
+    var e=EN[i];e.a++;
+    if(e.t==="boss"){
+      e.y=Math.min(80,e.y+e.vy);e.x+=e.vx;if(e.x<90||e.x>W-90)e.vx*=-1;
+      if(e.a%30===0){for(var a=-2;a<=2;a++){var ang=a*.3+Math.PI/2;BU.push({x:e.x,y:e.y+30,vx:Math.cos(ang)*4,vy:Math.sin(ang)*4,f:"e",l:200});}}
+    }else if(e.t==="b"){
+      e.x+=e.vx;e.y+=e.vy;if(e.x<50||e.x>W-50)e.vx*=-1;
+      if(e.a%70===0&&e.y>0&&e.y<H-200){var dx=P.x-e.x,dy=P.y-e.y,m=Math.hypot(dx,dy)||1;BU.push({x:e.x,y:e.y+20,vx:(dx/m)*3.2,vy:(dy/m)*3.2,f:"e",l:200});}
+    }else{e.x+=e.vx;e.y+=e.vy;if(e.a%80===0&&e.y>60)BU.push({x:e.x,y:e.y+10,vx:(Math.random()-.5)*1.2,vy:3.4,f:"e",l:200});}
+  }
+  for(var i=EN.length-1;i>=0;i--){
+    var e=EN[i];
+    if(e.y>H+60||e.hp<=0){
+      if(e.hp<=0){SCORE+=e.t==="boss"?5000:e.t==="b"?250:100;bbst(e.x,e.y);if(e.t==="boss"){if(SN===1){GS="gate";showGate();}else{GS="victory";}}}
+      EN.splice(i,1);
+    }
+  }
+  for(var i=BU.length-1;i>=0;i--){
+    var b=BU[i];b.x+=b.vx;b.y+=b.vy;b.l--;
+    if(b.l<=0||b.x<-10||b.x>W+10||b.y<-10||b.y>H+10){BU.splice(i,1);continue;}
+    if(b.f==="p"){
+      for(var j=0;j<EN.length;j++){var e=EN[j];if(Math.abs(b.x-e.x)<e.w/2&&Math.abs(b.y-e.y)<e.h/2){e.hp--;bst(b.x,b.y,GOLD);BU.splice(i,1);break;}}
+    }else{
+      if(Math.abs(b.x-P.x)<14&&Math.abs(b.y-P.y)<18){if(P.hurt<=0){P.hp--;P.hurt=40;bst(P.x,P.y,GOLD);if(P.hp<=0)GS="gameover";}BU.splice(i,1);}
+    }
+  }
+  for(var i=PA.length-1;i>=0;i--){
+    var p=PA[i];p.x+=p.vx;p.y+=p.vy;p.vy+=.1;p.l--;
+    if(p.l<=0){PA.splice(i,1);continue;}
+    X.globalAlpha=p.l/p.m;X.fillStyle=p.c;X.fillRect(p.x,p.y,p.s,p.s);X.globalAlpha=1;
+  }
+  for(var i=0;i<EN.length;i++){var e=EN[i];if(e.t==="o")drawOutlaw(e);else if(e.t==="b")drawBlimp(e);else drawBoss(e);}
+  for(var i=0;i<BU.length;i++)drawBullet(BU[i]);
+  drawGorilla(P.x,P.y,P.t);
+  drawHud();
+});
+</script>
+</body>
+</html>
